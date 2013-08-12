@@ -45,12 +45,12 @@ int main(int argc, char *argv[])
 	if(getline(&line, &len, fp) == 2)
 	{
 		puts("Found expected newline");
-		read = getline(&line, &len, fp)-2;
 	}
 	else
 	{
 		puts("There should be a newline here...");
 	}
+	read = getline(&line, &len, fp)-2;
 
 	uint32_t counter;
 	char *binary_name = malloc(read);
