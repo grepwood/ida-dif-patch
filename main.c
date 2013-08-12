@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
-#include <stdbool.h>
 
 void help(char * exe)
 {
@@ -71,8 +70,6 @@ int main(int argc, char *argv[])
 	binary = fopen(binary_name, "r");
 	newfile = fopen(argv[2], "w");
 
-//Here we get our address and values
-
 	int c;
 	uint32_t address, addr_counter = 0;
 	uint8_t old, new;
@@ -112,7 +109,10 @@ int main(int argc, char *argv[])
 	do
 	{
 		c = fgetc(binary);
-		if(c != EOF)	{fputc(c, newfile);}
+		if(c != EOF)
+		{
+			fputc(c, newfile);
+		}
 	}
 	while(c != EOF);
 
