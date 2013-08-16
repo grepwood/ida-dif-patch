@@ -31,7 +31,7 @@ int main(int argc, char *argv[])
 	{
 		puts("File opened");
 	}
-	read = getline(&line, &len, fp);
+	read = grepline(&line, &len, fp);
 	if(	strncmp(line, "This difference file has been created by IDA Pro", 48) == 0
 	||	strncmp(line, "This difference file is created by The Interactive Disassembler", 63) == 0)
 	{
@@ -42,10 +42,10 @@ int main(int argc, char *argv[])
 		puts("Unknown disassembler signature");
 	}
 
-	if(getline(&line, &len, fp) == 2)
+	if(grepline(&line, &len, fp) == 2)
 	{
 		puts("Found expected newline");
-		read = getline(&line, &len, fp)-2;
+		read = grepline(&line, &len, fp)-2;
 	}
 	else
 	{
@@ -75,9 +75,9 @@ int main(int argc, char *argv[])
 	uint8_t old, new;
 	char * hex_address = malloc(8);
 	char * hex_byte = malloc(2);
-	do
+	read = grepline(&line, &len, fp);
+	while(!feof(fp) && read != 16)
 	{
-		read = getline(&line, &len, fp);
 		for(counter = 0; counter < 8; ++counter)
 		{
 			hex_address[counter] = line[counter];
@@ -103,8 +103,8 @@ int main(int argc, char *argv[])
 		fputc(new, newfile);
 		++addr_counter;
 		fgetc(binary);
+		read = grepline(&line, &len, fp);
 	}
-	while(!feof(fp));
 	puts("All addresses modified");
 	do
 	{
