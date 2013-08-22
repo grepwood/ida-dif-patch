@@ -76,11 +76,14 @@ int main(int argc, char *argv[])
 		fclose(fp);
 		exit(1);
 	}
+#ifdef __WIN32
+	binary = fopen(binary_name, "rb");
+	newfile = fopen(argv[2], "wb");
+#else
+	binary = fopen(binary_name,"r");
+	newfile = fopen(argv[2],"w");
+#endif //__WIN32
 
-	binary = fopen(binary_name, "r");
-	newfile = fopen(argv[2], "w");
-
-//	int c;
 	uint32_t address, addr_counter = 0;
 	uint8_t old, new;
 	char * hex_address = malloc(8);
@@ -106,8 +109,6 @@ int main(int argc, char *argv[])
 
 		while(addr_counter < address)
 		{
-//			c = fgetc(binary);
-//			fputc(c, newfile);
 			fputc(fgetc(binary), newfile);
 			++addr_counter;
 		}
@@ -119,21 +120,16 @@ int main(int argc, char *argv[])
 	}
 	puts("All addresses modified");
 	int c;
-	uint32_t bytes = 0;
-//	do
-	while(c != EOF)
+	while(!feof(binary))
 	{
 		c = fgetc(binary);
 		if(c != EOF)
 		{
-			++bytes;
 			fputc(c, newfile);
 		}
 	}
-//	while(c != EOF);
 
-//	puts("Finished!");
-	printf("Finished! After patching, copied %lu bytes\n", bytes);
+	puts("Finished!");
 
 	free(binary_name);
 	free(hex_address);
