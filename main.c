@@ -3,6 +3,16 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "grepline.h"
+
+#ifdef __WIN32
+#	define OS_HEXLINE 16
+#	define STRANGE_NEWLINE 1
+#else
+#	define OS_HEXLINE 17
+#	define STRANGE_NEWLINE 2
+#endif //__WIN32
+
 void help(char * exe)
 {
 	printf("IDA .dif patcher\nUsage: %s .dif output\n\t.dif - path to a .dif file to use\n\toutput - output file\n", exe);
@@ -18,8 +28,8 @@ int main(int argc, char *argv[])
 	FILE * fp;
 	FILE * newfile;
 	char * line = NULL;
-	size_t len = 0;
-	ssize_t read;
+	size_t	read,
+		len = 0;
 	FILE * binary;
 	fp = fopen(argv[1], "r");
 	if(fp == NULL)
@@ -42,10 +52,10 @@ int main(int argc, char *argv[])
 		puts("Unknown disassembler signature");
 	}
 
-	if(grepline(&line, &len, fp) == 2)
+	if(grepline(&line, &len, fp) == STRANGE_NEWLINE)
 	{
 		puts("Found expected newline");
-		read = grepline(&line, &len, fp)-2;
+		read = grepline(&line, &len, fp)-STRANGE_NEWLINE;
 	}
 	else
 	{
@@ -70,13 +80,13 @@ int main(int argc, char *argv[])
 	binary = fopen(binary_name, "r");
 	newfile = fopen(argv[2], "w");
 
-	int c;
+//	int c;
 	uint32_t address, addr_counter = 0;
 	uint8_t old, new;
 	char * hex_address = malloc(8);
 	char * hex_byte = malloc(2);
 	read = grepline(&line, &len, fp);
-	while(!feof(fp) && read != 16)
+	while(!feof(fp) && read == OS_HEXLINE)
 	{
 		for(counter = 0; counter < 8; ++counter)
 		{
@@ -94,10 +104,12 @@ int main(int argc, char *argv[])
 		}
 		new = strtoul(hex_byte, NULL, 16);
 
-		for(addr_counter; addr_counter < address; ++addr_counter)
+		while(addr_counter < address)
 		{
-			c = fgetc(binary);
-			fputc(c, newfile);
+//			c = fgetc(binary);
+//			fputc(c, newfile);
+			fputc(fgetc(binary), newfile);
+			++addr_counter;
 		}
 		printf("Modifying byte %x at offset %x to %x\n", old, address, new);
 		fputc(new, newfile);
@@ -106,17 +118,22 @@ int main(int argc, char *argv[])
 		read = grepline(&line, &len, fp);
 	}
 	puts("All addresses modified");
-	do
+	int c;
+	uint32_t bytes = 0;
+//	do
+	while(c != EOF)
 	{
 		c = fgetc(binary);
 		if(c != EOF)
 		{
+			++bytes;
 			fputc(c, newfile);
 		}
 	}
-	while(c != EOF);
+//	while(c != EOF);
 
-	puts("Finished!");
+//	puts("Finished!");
+	printf("Finished! After patching, copied %lu bytes\n", bytes);
 
 	free(binary_name);
 	free(hex_address);
