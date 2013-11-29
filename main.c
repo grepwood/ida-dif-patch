@@ -8,10 +8,14 @@
 #ifdef __WIN32
 #	define OS_HEXLINE 16
 #	define STRANGE_NEWLINE 1
+#	define READ "rb"
+#	define WRITE "wb"
 #else
 #	define OS_HEXLINE 17
 #	define STRANGE_NEWLINE 2
-#endif //__WIN32
+#	define READ "r"
+#	define WRITE "w"
+#endif /*__WIN32*/
 
 void help(char * exe)
 {
@@ -20,17 +24,17 @@ void help(char * exe)
 
 int main(int argc, char *argv[])
 {
-	if(argc != 3)  
+	FILE * fp;
+	FILE * newfile;
+	FILE * binary;
+	size_t read;
+	size_t len = 0;
+	char * line = NULL;
+	if(argc != 3)
 	{
 		help(argv[0]);
 		exit(1);
 	}
-	FILE * fp;
-	FILE * newfile;
-	char * line = NULL;
-	size_t	read,
-		len = 0;
-	FILE * binary;
 	fp = fopen(argv[1], "r");
 	if(fp == NULL)
 	{
@@ -76,16 +80,13 @@ int main(int argc, char *argv[])
 		fclose(fp);
 		exit(1);
 	}
-#ifdef __WIN32
-	binary = fopen(binary_name, "rb");
-	newfile = fopen(argv[2], "wb");
-#else
-	binary = fopen(binary_name,"r");
-	newfile = fopen(argv[2],"w");
-#endif //__WIN32
+	binary = fopen(binary_name, READ);
+	newfile = fopen(argv[2], WRITE);
 
-	uint32_t address, addr_counter = 0;
-	uint8_t old, new;
+	uint32_t address;
+	uint32_t addr_counter = 0;
+	uint8_t old;
+	uint8_t new;
 	char * hex_address = malloc(8);
 	char * hex_byte = malloc(2);
 	read = grepline(&line, &len, fp);
