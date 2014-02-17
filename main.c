@@ -5,138 +5,195 @@
 
 #include "grepline.h"
 
-#ifdef __WIN32
+#ifdef _WIN32
 #	define OS_HEXLINE 16
-#	define STRANGE_NEWLINE 1
+#	define OS_NEWLINE 1
 #	define READ "rb"
 #	define WRITE "wb"
+#	ifndef _CRT_SECURE_NO_WARNINGS
+#		define _CRT_SECURE_NO_WARNINGS
+#	endif /*_CRT_SECURE_NO_WARNINGS*/
 #else
 #	define OS_HEXLINE 17
-#	define STRANGE_NEWLINE 2
+#	define OS_NEWLINE 2
 #	define READ "r"
 #	define WRITE "w"
-#endif /*__WIN32*/
+#endif /*_WIN32*/
 
 void help(char * exe)
 {
 	printf("IDA .dif patcher\nUsage: %s .dif output\n\t.dif - path to a .dif file to use\n\toutput - output file\n", exe);
 }
 
+int8_t CheckIDAVersion(FILE * DifFile)
+{
+	int8_t result = 0;
+	size_t len = 0;
+	char * line;
+	grepline(&line, &len, DifFile);
+	if(!strcmp(line, "This difference file has been created by IDA Pro"))
+	{
+		result = 6; /*IDA 6*/
+	}
+	else
+	{
+		if(!strcmp(line, "This difference file is created by The Interactive Disassembler"))
+		{
+			result = 5; /*IDA 5*/
+		}
+	}
+	free(line);
+	return result;
+}
+
+int8_t CheckNewline(FILE * DifFile)
+{
+	int8_t result = 1;
+	size_t len = 0;
+	char * line;
+	grepline(&line, &len, DifFile);
+	if(len != OS_NEWLINE)
+	{
+		result = 0; /*This is not an empty line*/
+	}
+	free(line);
+	return result;
+}
+
+void ReadFileName(FILE * DifFile, char * BinaryFileName)
+{
+	size_t len = 0;
+	char * line;
+	grepline(&line,&len,DifFile);
+	len -= OS_NEWLINE;
+	BinaryFileName = malloc(len+1);
+	memset(BinaryFileName,0,len+1);
+	memcpy(BinaryFileName,line,len);
+	free(line);
+}
+
+void IDADifPatch(FILE * DifFile, FILE * Binary, FILE * NewFile)
+{
+	char OffsetString[9];
+	uint32_t OffsetTarget = 0;
+	uint32_t OffsetCurrent = 0;
+	size_t len = 0;
+	char * line;
+	uint8_t New = 0;
+	uint8_t Old = 0;
+	int Buffer = 0;
+	grepline(&line,&len,DifFile);
+	while(!feof(DifFile) && len == OS_HEXLINE)
+	{
+/* Getting target offset */
+		memset(OffsetString,0,9);
+		memcpy(OffsetString,line,8);
+		OffsetTarget = strtoul(OffsetString,NULL,16);
+/* Preparing old and new byte */
+		memset(OffsetString,0,3);
+		memcpy(OffsetString,line+10,2);
+		Old = (uint8_t)strtol(OffsetString,NULL,16);
+		memset(OffsetString,0,3);
+		memcpy(OffsetString,line+13,2);
+		New = (uint8_t)strtol(OffsetString,NULL,16);
+/* Filling space before target offset */
+		while(OffsetCurrent < OffsetTarget)
+		{
+			fputc(fgetc(Binary),NewFile);
+			++OffsetCurrent;
+		}
+/* Patching a byte */
+		printf("PATCH: @%X : %X->%X\n", OffsetTarget, Old, New);
+		Buffer = fgetc(Binary);
+/* Checking if we found an expected byte */
+		if(Buffer != Old)
+		{
+			printf("WARNING: @%X : expected %X : got %X\n", OffsetTarget, Old, Buffer);
+		}
+		fputc(New,NewFile);
+		++OffsetCurrent;
+		grepline(&line, &len, DifFile);
+	}
+	free(line);
+/* Done reading difference file. Filling the rest of the binary */
+	while(!feof(Binary))
+	{
+		Buffer = fgetc(Binary);
+		if(Buffer != EOF)
+		{
+			fputc(Buffer,NewFile);
+		}
+	}
+	puts("PATCH: Finished!");
+}
+
 int main(int argc, char *argv[])
 {
-	FILE * fp;
-	FILE * newfile;
-	FILE * binary;
-	size_t read;
-	size_t len = 0;
-	char * line = NULL;
+	FILE * DifFile;
+	FILE * NewFile;
+	FILE * Binary;
+	char * BinaryFileName = NULL;
+	int8_t IDAVersion = 0;
+	int8_t IDAnewline = 0;
+/* Did we forget arguments? */
 	if(argc != 3)
 	{
 		help(argv[0]);
 		exit(1);
 	}
-	fp = fopen(argv[1], "r");
-	if(fp == NULL)
+/* We can't work on empty files */
+	DifFile = fopen(argv[1], "r");
+	if(DifFile == NULL)
 	{
-		puts("Error: empty file");
+		puts("ERROR: empty file");
+		fclose(DifFile);
 		exit(1);
 	}
 	else
 	{
-		puts("File opened");
+		puts("OK: File opened");
 	}
-	read = grepline(&line, &len, fp);
-	if(	strncmp(line, "This difference file has been created by IDA Pro", 48) == 0
-	||	strncmp(line, "This difference file is created by The Interactive Disassembler", 63) == 0)
+/* Let's check if this is an actual IDA difference file */
+	IDAVersion = CheckIDAVersion(DifFile);
+	if(IDAVersion != 5 && IDAVersion != 6)
 	{
-		puts("IDA .dif file recognized");
-	}
-	else
-	{
-		puts("Unknown disassembler signature");
-	}
-
-	if(grepline(&line, &len, fp) == STRANGE_NEWLINE)
-	{
-		puts("Found expected newline");
-		read = grepline(&line, &len, fp)-STRANGE_NEWLINE;
+		puts("WARNING: Unsupported disassembler detected. Proceed with caution.");
 	}
 	else
 	{
-		puts("There should be a newline here...");
+		printf("OK: IDA %i recognized and hopefully not a spoof. Cross your fingers.\n",IDAVersion);
 	}
-
-	uint32_t counter;
-	char *binary_name = malloc(read);
-	for(counter = 0; counter < read; ++counter)
+/* IDA difference files have 2nd line empty */
+	IDAnewline = CheckNewline(DifFile);
+	if(!IDAnewline)
 	{
-		binary_name[counter] = line[counter];
-	}
-	printf("Original file: %s\n", binary_name);
-	if(strcmp(argv[2], binary_name) == 0)
-	{
-		puts("Can't write to the original file");
-		free(binary_name);
-		fclose(fp);
+		puts("ERROR: Failed newline check. Aborting patch.");
+		fclose(DifFile);
 		exit(1);
 	}
-	binary = fopen(binary_name, READ);
-	newfile = fopen(argv[2], WRITE);
-
-	uint32_t address;
-	uint32_t addr_counter = 0;
-	uint8_t old;
-	uint8_t new;
-	char * hex_address = malloc(8);
-	char * hex_byte = malloc(2);
-	read = grepline(&line, &len, fp);
-	while(!feof(fp) && read == OS_HEXLINE)
+/* If we haven't failed this far, we have to extract the binary name and open it */
+	ReadFileName(DifFile,BinaryFileName);
+	Binary = fopen(BinaryFileName,READ);
+/* Let's check if this isn't a dummy */
+	if(Binary == NULL)
 	{
-		for(counter = 0; counter < 8; ++counter)
-		{
-			hex_address[counter] = line[counter];
-		}
-		address = strtoul(hex_address, NULL, 16);
-		for(counter = 0; counter < 2; ++counter)
-		{
-			hex_byte[counter] = line[counter+10];
-		}
-		old = strtoul(hex_byte, NULL, 16);
-		for(counter = 0; counter < 2; ++counter)
-		{
-			hex_byte[counter] = line[counter+13];
-		}
-		new = strtoul(hex_byte, NULL, 16);
-
-		while(addr_counter < address)
-		{
-			fputc(fgetc(binary), newfile);
-			++addr_counter;
-		}
-		printf("Modifying byte %x at offset %x to %x\n", old, address, new);
-		fputc(new, newfile);
-		++addr_counter;
-		fgetc(binary);
-		read = grepline(&line, &len, fp);
+		printf("ERROR: Original file doesn't exist.\nINFO: ORIG %s\n",BinaryFileName);
+		free(BinaryFileName);
+		fclose(Binary);
+		fclose(DifFile);
+		exit(1);
 	}
-	puts("All addresses modified");
-	int c;
-	while(!feof(binary))
-	{
-		c = fgetc(binary);
-		if(c != EOF)
-		{
-			fputc(c, newfile);
-		}
-	}
-
-	puts("Finished!");
-
-	free(binary_name);
-	free(hex_address);
-	free(hex_byte);
-	fclose(fp);
-	fclose(binary);
-	fclose(newfile);
+/* Finally, let's create a new file to write to.
+ * NOTE: file with the same name will be overwritten without patcher giving prior notice! */
+	NewFile = fopen(argv[2],WRITE);
+/* Declare some stuff */
+	printf("DIF\tORIG\tOUT\n%s\t%s\t%s\n",argv[1],BinaryFileName,argv[2]);
+	free(BinaryFileName);
+/* Ready, set, patch! */
+	IDADifPatch(DifFile,Binary,NewFile);
+/* Cleaning up */
+	fclose(DifFile);
+	fclose(Binary);
+	fclose(NewFile);
 	return 0;
 }
