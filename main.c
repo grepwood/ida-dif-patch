@@ -13,11 +13,13 @@
 #	ifndef _CRT_SECURE_NO_WARNINGS
 #		define _CRT_SECURE_NO_WARNINGS
 #	endif /*_CRT_SECURE_NO_WARNINGS*/
-#else
-#	define OS_HEXLINE 17
-#	define OS_NEWLINE 2
-#	define READ "r"
-#	define WRITE "w"
+#	elif LINUX
+#		define OS_HEXLINE 17
+#		define OS_NEWLINE 2
+#		define READ "r"
+#		define WRITE "w"
+#	else
+#		error Unknown system.
 #endif /*_WIN32*/
 
 void help(char * exe)
@@ -29,15 +31,15 @@ int8_t CheckIDAVersion(FILE * DifFile)
 {
 	int8_t result = 0;
 	size_t len = 0;
-	char * line;
+	char * line = NULL;
 	grepline(&line, &len, DifFile);
-	if(!strcmp(line, "This difference file has been created by IDA Pro"))
+	if(!strcmp(line, "This difference file has been created by IDA Pro\n"))
 	{
 		result = 6; /*IDA 6*/
 	}
 	else
 	{
-		if(!strcmp(line, "This difference file is created by The Interactive Disassembler"))
+		if(!strcmp(line, "This difference file is created by The Interactive Disassembler\n"))
 		{
 			result = 5; /*IDA 5*/
 		}
@@ -50,7 +52,7 @@ int8_t CheckNewline(FILE * DifFile)
 {
 	int8_t result = 1;
 	size_t len = 0;
-	char * line;
+	char * line = NULL;
 	grepline(&line, &len, DifFile);
 	if(len != OS_NEWLINE)
 	{
@@ -60,15 +62,15 @@ int8_t CheckNewline(FILE * DifFile)
 	return result;
 }
 
-void ReadFileName(FILE * DifFile, char * BinaryFileName)
+void ReadFileName(FILE * DifFile, char ** BinaryFileName)
 {
 	size_t len = 0;
-	char * line;
+	char * line = NULL;
 	grepline(&line,&len,DifFile);
-	len -= OS_NEWLINE;
-	BinaryFileName = malloc(len+1);
-	memset(BinaryFileName,0,len+1);
-	memcpy(BinaryFileName,line,len);
+	len = len - OS_NEWLINE;
+	*BinaryFileName = malloc(len+1);
+	memset(*BinaryFileName,0,len+1);
+	memcpy(*BinaryFileName,line,len);
 	free(line);
 }
 
@@ -78,7 +80,7 @@ void IDADifPatch(FILE * DifFile, FILE * Binary, FILE * NewFile)
 	uint32_t OffsetTarget = 0;
 	uint32_t OffsetCurrent = 0;
 	size_t len = 0;
-	char * line;
+	char * line = NULL;
 	uint8_t New = 0;
 	uint8_t Old = 0;
 	int Buffer = 0;
@@ -89,6 +91,7 @@ void IDADifPatch(FILE * DifFile, FILE * Binary, FILE * NewFile)
 		memset(OffsetString,0,9);
 		memcpy(OffsetString,line,8);
 		OffsetTarget = strtoul(OffsetString,NULL,16);
+		printf("PATCH: @%s : ", OffsetString);
 /* Preparing old and new byte */
 		memset(OffsetString,0,3);
 		memcpy(OffsetString,line+10,2);
@@ -103,7 +106,7 @@ void IDADifPatch(FILE * DifFile, FILE * Binary, FILE * NewFile)
 			++OffsetCurrent;
 		}
 /* Patching a byte */
-		printf("PATCH: @%X : %X->%X\n", OffsetTarget, Old, New);
+		printf("%X->%X\n", Old, New);
 		Buffer = fgetc(Binary);
 /* Checking if we found an expected byte */
 		if(Buffer != Old)
@@ -172,7 +175,7 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 /* If we haven't failed this far, we have to extract the binary name and open it */
-	ReadFileName(DifFile,BinaryFileName);
+	ReadFileName(DifFile,&BinaryFileName);
 	Binary = fopen(BinaryFileName,READ);
 /* Let's check if this isn't a dummy */
 	if(Binary == NULL)
