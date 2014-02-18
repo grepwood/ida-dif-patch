@@ -13,7 +13,7 @@
 #	ifndef _CRT_SECURE_NO_WARNINGS
 #		define _CRT_SECURE_NO_WARNINGS
 #	endif /*_CRT_SECURE_NO_WARNINGS*/
-#	elif LINUX
+#	elif linux
 #		define OS_HEXLINE 17
 #		define OS_NEWLINE 2
 #		define READ "r"
@@ -33,13 +33,13 @@ int8_t CheckIDAVersion(FILE * DifFile)
 	size_t len = 0;
 	char * line = NULL;
 	grepline(&line, &len, DifFile);
-	if(!strcmp(line, "This difference file has been created by IDA Pro\n"))
+	if(!strncmp(line,"This difference file has been created by IDA Pro",len-OS_HEXLINE) && 48 == len-OS_HEXLINE)
 	{
 		result = 6; /*IDA 6*/
 	}
 	else
 	{
-		if(!strcmp(line, "This difference file is created by The Interactive Disassembler\n"))
+		if(!strncmp(line, "This difference file is created by The Interactive Disassembler",len-OS_HEXLINE) && 63 == len-OS_HEXLINE)
 		{
 			result = 5; /*IDA 5*/
 		}
