@@ -33,13 +33,14 @@ int8_t CheckIDAVersion(FILE * DifFile)
 	size_t len = 0;
 	char * line = NULL;
 	grepline(&line, &len, DifFile);
-	if(!strncmp(line,"This difference file has been created by IDA Pro",len-OS_HEXLINE) && 48 == len-OS_HEXLINE)
+	printf("STATS: %i\n", len-OS_HEXLINE);
+	if(!strncmp(line,"This difference file has been created by IDA Pro",len-OS_HEXLINE) && 33 == len-OS_HEXLINE)
 	{
 		result = 6; /*IDA 6*/
 	}
 	else
 	{
-		if(!strncmp(line, "This difference file is created by The Interactive Disassembler",len-OS_HEXLINE) && 63 == len-OS_HEXLINE)
+		if(!strncmp(line, "This difference file is created by The Interactive Disassembler",len-OS_HEXLINE) && 48 == len-OS_HEXLINE)
 		{
 			result = 5; /*IDA 5*/
 		}
