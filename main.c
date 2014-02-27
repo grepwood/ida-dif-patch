@@ -5,17 +5,16 @@
 
 #include "grepline.h"
 
+#define OS_HEXLINE 16
+#define OS_NEWLINE 1
+
 #ifdef _WIN32
-#	define OS_HEXLINE 16
-#	define OS_NEWLINE 1
 #	define READ "rb"
 #	define WRITE "wb"
 #	ifndef _CRT_SECURE_NO_WARNINGS
 #		define _CRT_SECURE_NO_WARNINGS
 #	endif /*_CRT_SECURE_NO_WARNINGS*/
 #	elif linux
-#		define OS_HEXLINE 17
-#		define OS_NEWLINE 2
 #		define READ "r"
 #		define WRITE "w"
 #	else
